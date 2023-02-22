@@ -6,6 +6,7 @@
  * https://www.nayuki.io/page/reference-arithmetic-coding
  */
 
+import java.util.Arrays;
 import java.util.Objects;
 
 
@@ -55,6 +56,7 @@ public final class SimpleFrequencyTable implements FrequencyTable {
 				throw new IllegalArgumentException("Negative frequency");
 			total = Math.addExact(x, total);
 		}
+		System.out.println("total = " + total);
 		cumulative = null;
 	}
 	
@@ -188,7 +190,9 @@ public final class SimpleFrequencyTable implements FrequencyTable {
 	
 	
 	// Recomputes the array of cumulative symbol frequencies.
-	private void initCumulative() {
+	public void initCumulative() {
+		// [1, 2, 3]
+		// [0, 1, 3]
 		cumulative = new int[frequencies.length + 1];
 		int sum = 0;
 		for (int i = 0; i < frequencies.length; i++) {
@@ -197,6 +201,7 @@ public final class SimpleFrequencyTable implements FrequencyTable {
 			sum = Math.addExact(frequencies[i], sum);
 			cumulative[i + 1] = sum;
 		}
+		System.out.println(Arrays.toString(cumulative));
 		if (sum != total)
 			throw new AssertionError();
 	}

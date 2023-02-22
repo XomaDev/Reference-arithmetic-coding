@@ -81,12 +81,14 @@ public abstract class ArithmeticCoderBase {
 		if (!(1 <= numBits && numBits <= 62))
 			throw new IllegalArgumentException("State size out of range");
 		numStateBits = numBits;
-		fullRange = 1L << numStateBits;
-		halfRange = fullRange >>> 1;  // Non-zero
-		quarterRange = halfRange >>> 1;  // Can be zero
-		minimumRange = quarterRange + 2;  // At least 2
-		maximumTotal = Math.min(Long.MAX_VALUE / fullRange, minimumRange);
-		stateMask = fullRange - 1;
+		// equal to Math.pow(1, numBits)
+		fullRange = 1L << numStateBits; // represents the maximum number of bytes: 4294967296L
+		halfRange = fullRange >>> 1;  // Non-zero // divides the number by 2: 2147483648
+		quarterRange = halfRange >>> 1;  // Can be zero, divides the number by 2: 1073741824
+		minimumRange = quarterRange + 2;  // At least 2: 1073741826
+		// min(9223372036854775807L / 4294967296L, 1073741826)
+		maximumTotal = Math.min(Long.MAX_VALUE / fullRange, minimumRange); // 1073741826
+		stateMask = fullRange - 1; // max representation - 1
 		
 		low = 0;
 		high = stateMask;
@@ -117,40 +119,93 @@ public abstract class ArithmeticCoderBase {
 	 * @throws IllegalArgumentException if the symbol has zero frequency or the frequency table's total is too large
 	 */
 	protected void update(CheckedFrequencyTable freqs, int symbol) throws IOException {
+		if (symbol == 256) {
+			// for now
+			return;
+		}
 		// State check
 		if (low >= high || (low & stateMask) != low || (high & stateMask) != high)
 			throw new AssertionError("Low or high out of range");
-		long range = high - low + 1;
-		if (!(minimumRange <= range && range <= fullRange))
+		long difference = high - low + 1;
+		if (!(minimumRange <= difference && difference <= fullRange))
 			throw new AssertionError("Range out of range");
 		
 		// Frequency table values check
-		long total = freqs.getTotal();
+		long total = freqs.getTotal(); // total number of frequencies
 		long symLow = freqs.getLow(symbol);
 		long symHigh = freqs.getHigh(symbol);
+
+		System.out.println("char " + (char) symbol + " low " + symLow + " high " + symHigh);
+
 		if (symLow == symHigh)
 			throw new IllegalArgumentException("Symbol has zero frequency");
 		if (total > maximumTotal)
 			throw new IllegalArgumentException("Cannot code symbol because total is too large");
-		
+
+		// performs the expansion
 		// Update range
-		long newLow  = low + symLow  * range / total;
-		long newHigh = low + symHigh * range / total - 1;
-		low = newLow;
-		high = newHigh;
+		long newLow  = low + symLow  * difference / total; // low * probability
+		long newHigh = low + symHigh * difference / total - 1; // high * probability
+
+		System.out.println("------new: " + newLow + " | " + newHigh);
+
+		low = newLow; // next low = this
+		high = newHigh; // next high = this
 		
 		// While low and high have the same top bit value, shift them out
+		// 110110
+		// 101010
+
+		// 10000000000000000000000000000000
+		// 011100
+		// 000000
+		boolean handled = false;
 		while (((low ^ high) & halfRange) == 0) {
+			handled = true;
+			System.out.println("yeah");
 			shift();
+
+			// removes one bit from each number?
+			// 101000
+			// 111111
+
+			// 101000
+			// 000001
+			// 101001
+			// doubling both, but high gets incremented
 			low  = ((low  << 1) & stateMask);
-			high = ((high << 1) & stateMask) | 1;
+			high = ((high << 1) & stateMask) | 1; // < ----- its kind of like incrementing it by 1
+		}
+		if (handled) {
+			System.out.println("after: " + low + " & high " + high);
 		}
 		// Now low's top bit must be 0 and high's top bit must be 1
 		
 		// While low's top two bits are 01 and high's are 10, delete the second highest bit of both
+
+		// i think its to prevent overflow of integers
 		while ((low & ~high & quarterRange) != 0) {
-			underflow();
+			underflow(); // just does some checks that's it
 			low = (low << 1) ^ halfRange;
+			// 01001010
+			// 010010100
+			// 100000000
+
+			// 010010100
+
+			// -------------------------- high
+
+
+			// 1010001    81    (was the second highest)
+			// 1000000
+			// 0010001
+
+			// 00100010
+			// 10000000
+
+			// 00100010
+			// 00000001
+			// 00100011
 			high = ((high ^ halfRange) << 1) | halfRange | 1;
 		}
 	}

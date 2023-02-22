@@ -88,10 +88,17 @@ public final class ArithmeticEncoder extends ArithmeticCoderBase {
 	
 	
 	protected void shift() throws IOException {
+		// we do this because an integer is 32 bit
+		// and we shift it 32 times but one lesser (31)
+		// and we will have the first bit of the number remaining
 		int bit = (int)(low >>> (numStateBits - 1));
 		output.write(bit);
 		
 		// Write out the saved underflow bits
+		// 10101
+		// 00001
+
+		// 10100
 		for (; numUnderflow > 0; numUnderflow--)
 			output.write(bit ^ 1);
 	}
